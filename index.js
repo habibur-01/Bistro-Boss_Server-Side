@@ -5,7 +5,12 @@ const cors = require('cors')
 const port = process.env.PORT || 3000
 
 // middleware
-app.use(cors());
+app.use(cors({
+    origin:[
+        'http://localhost:5173'
+    ],
+    credentials: true
+}));
 app.use(express.json());
 
 
@@ -31,6 +36,7 @@ async function run() {
         const menuCollection = client.db("Bistro_Boss").collection('menu')
         const reviewCollection = client.db("Bistro_Boss").collection('reviews')
         const userCollection = client.db("Bistro_Boss").collection('user')
+        const cartCollection = client.db("Bistro_Boss").collection('cartItem')
 
 
 
@@ -54,6 +60,17 @@ async function run() {
         // get reviews data
         app.get("/reviews", async(req, res) => {
             const result = await reviewCollection.find().toArray()
+            res.send(result)
+        })
+
+        app.post("/carts", async(req, res)=>{
+            const cartItem =req.body
+            const result = await cartCollection.insertOne(cartItem)
+            res.send(result)
+        })
+        app.get("/carts", async(req, res)=>{
+            
+            const result = await cartCollection.find().toArray()
             res.send(result)
         })
         // Send a ping to confirm a successful connection
