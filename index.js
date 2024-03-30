@@ -1,5 +1,7 @@
 const express = require('express')
 require('dotenv').config()
+const jwt = require('jsonwebtoken');
+// const stripe = require("stripe")(process.env.STRIPE_TEST_KEY)
 const app = express()
 const cors = require('cors')
 const port = process.env.PORT || 3000
@@ -40,6 +42,30 @@ async function run() {
 
 
 
+        // jwt related api
+        app.post("/jwt", async (req, res) => {
+            const user = req.body
+            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+                expiresIn: '1h'
+            })
+            res.send({ token });
+        })
+        // middlewares
+        const verifyToken = (req, res, next) => {
+            // console.log('inside verify token', req.headers.authorization)
+            if (!req.headers.authorization) {
+                return res.status(401).send({ message: 'forbidden access' })
+            }
+            const token = req.headers.authorization.split(' ')[1]
+            jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: "forbidden access" })
+                }
+                req.decoded = decoded;
+                next()
+            })
+            // next()
+        }
         // post user data
         app.post("/users", async (req, res) => {
             const user = req.body
@@ -47,24 +73,39 @@ async function run() {
             res.send(result)
         })
         // get user data
-        app.get("/users", async (req, res) => {
+        app.get("/users", verifyToken, async (req, res) => {
+
             const result = await userCollection.find().toArray()
             res.send(result)
         })
+
+        // app.get("/users/admin/:email", async(req, res)=>{
+        //     const email = req.params.email
+        //     if(email!=req.decoded.email){
+        //         return res.status(403).send({message:"unauthorized access"})
+        //     }
+        //     const query ={email:email}
+        //     const user = await userCollection.findOne(query)
+        //     let admin = false;
+        //     if(user){
+        //         admin = user?.role === 'admin';
+        //     }
+        //     res.send({admin})
+        // })
         // delete user
         app.delete("/users/:id", async (req, res) => {
             const id = req.params.id
-            const query = {_id: new ObjectId(id) }
+            const query = { _id: new ObjectId(id) }
             const result = await userCollection.deleteOne(query)
             res.send(result)
         })
         // update user data(make admin)
-        app.patch("/users/admin/:id", async(req, res)=>{
+        app.patch("/users/admin/:id", async (req, res) => {
             const id = req.params.id
-            const query = {_id: new ObjectId(id)}
-            const updateDoc={
-                $set:{
-                   role: 'admin'
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    role: 'admin'
                 }
             }
             const result = await userCollection.updateOne(query, updateDoc)
@@ -73,6 +114,28 @@ async function run() {
         // get menu data
         app.get("/menu", async (req, res) => {
             const result = await menuCollection.find().toArray()
+            res.send(result)
+        })
+        app.post("/menu", async (req, res) => {
+            const menu = req.body
+            const result = await menuCollection.insertOne(menu)
+            res.send(result)
+        })
+        app.delete("/menu/:id", async(req, res) => {
+           const id = req.params.id
+           const query = {_id: new ObjectId(id)}
+           const result = await menuCollection.deleteOne(query)
+           res.send(result)
+        })
+        app.patch("/menu/admin/:id", async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: {
+                    role: 'admin'
+                }
+            }
+            const result = await menuCollection.updateOne(query, updateDoc)
             res.send(result)
         })
 
@@ -104,6 +167,21 @@ async function run() {
             const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
+        // app.post('/create-payment-intent', async (req, res) => {
+        //     const { price } = req.body
+        //     const amount = parseInt(price * 100)
+
+        //     const paymentIntent = await stripe.paymentIntents.create({
+        //         amount: amount,
+        //         currency: "usd",
+        //         payment_method_types: ['card']
+        //         // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+
+        //     });
+        //     res.send({
+        //         clientSecret: paymentIntent.client_secret,
+        //     });
+        // })
 
 
         // Send a ping to confirm a successful connection
