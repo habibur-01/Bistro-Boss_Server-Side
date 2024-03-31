@@ -1,7 +1,7 @@
 const express = require('express')
 require('dotenv').config()
 const jwt = require('jsonwebtoken');
-// const stripe = require("stripe")(process.env.STRIPE_TEST_KEY)
+const stripe = require("stripe")(process.env.STRIPE_TEST_KEY)
 const app = express()
 const cors = require('cors')
 const port = process.env.PORT || 3000
@@ -32,13 +32,14 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
 
         const menuCollection = client.db("Bistro_Boss").collection('menu')
         const reviewCollection = client.db("Bistro_Boss").collection('reviews')
         const userCollection = client.db("Bistro_Boss").collection('user')
         const cartCollection = client.db("Bistro_Boss").collection('cartItem')
+        const confirmItemCollection = client.db("Bistro_Boss").collection('ConfirmPayment')
 
 
 
@@ -69,6 +70,11 @@ async function run() {
         // post user data
         app.post("/users", async (req, res) => {
             const user = req.body
+            const query = { email: user?.email }
+            const existingUser = await userCollection.findOne(query)
+            if (existingUser) {
+                return res.send({ message: 'user already exist', insertedId: null })
+            }
             const result = await userCollection.insertOne(user)
             res.send(result)
         })
@@ -121,18 +127,30 @@ async function run() {
             const result = await menuCollection.insertOne(menu)
             res.send(result)
         })
-        app.delete("/menu/:id", async(req, res) => {
-           const id = req.params.id
-           const query = {_id: new ObjectId(id)}
-           const result = await menuCollection.deleteOne(query)
-           res.send(result)
+        app.delete("/menu/:id", async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await menuCollection.deleteOne(query)
+            res.send(result)
+        })
+        app.get("/menu/:id", async (req, res) => {
+            const id = req.params.id
+            const query = { _id: new ObjectId(id) }
+            const result = await menuCollection.findOne(query)
+            res.send(result)
         })
         app.patch("/menu/admin/:id", async (req, res) => {
             const id = req.params.id
+            const item = req.body
+            console.log(item)
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
                 $set: {
-                    role: 'admin'
+                    name: item.name,
+                    category: item.category,
+                    price: item.price,
+                    recipe: item.recipe,
+                    image: item.updatedImage
                 }
             }
             const result = await menuCollection.updateOne(query, updateDoc)
@@ -167,25 +185,34 @@ async function run() {
             const result = await cartCollection.deleteOne(query)
             res.send(result)
         })
-        // app.post('/create-payment-intent', async (req, res) => {
-        //     const { price } = req.body
-        //     const amount = parseInt(price * 100)
 
-        //     const paymentIntent = await stripe.paymentIntents.create({
-        //         amount: amount,
-        //         currency: "usd",
-        //         payment_method_types: ['card']
-        //         // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+        app.post("/confirmPayment", async (req, res) => {
+            const item = req.body
+            const result = await confirmItemCollection.insertOne(item)
+            res.send(result)
+        })
+        app.get("/confirmPayment", async (req, res) => {
+            const result = await confirmItemCollection.find().toArray()
+            res.send(result)
+        })
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body
+            const amount = parseInt(price * 100)
 
-        //     });
-        //     res.send({
-        //         clientSecret: paymentIntent.client_secret,
-        //     });
-        // })
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_method_types: ['card']
+
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        })
 
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
