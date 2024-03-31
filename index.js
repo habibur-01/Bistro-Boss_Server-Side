@@ -9,7 +9,9 @@ const port = process.env.PORT || 3000
 // middleware
 app.use(cors({
     origin: [
-        'http://localhost:5173'
+        'http://localhost:5173',
+        'https://bistro-boss-b68c7.web.app',
+        'https://bistro-boss-b68c7.firebaseapp.com'
     ],
     credentials: true
 }));
